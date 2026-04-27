@@ -31,6 +31,12 @@ from src.config import DISEASES, SINDY, FIGURE_DPI
 from src.sindy_core import print_discovered_model
 from src.model_selection import grid_search
 from src.psd_analysis import compute_psd, compute_aic_psd
+from src.results_io import (
+    load_paper_reference,
+    result_to_record,
+    save_full_xi_json,
+    save_results_csv,
+)
 from src.visualization import (
     plot_time_series_comparison,
     plot_coefficients,
@@ -792,6 +798,12 @@ def run_disease_real(disease_name, fast=False):
     # Store year_fracs in result for summary figure
     best["year_fracs"] = year_fracs
 
+    # ===== STAGE 10: Export machine-readable results (JSON) =====
+    # The legacy pipeline only emitted PNGs; this dump makes the
+    # discovered model directly comparable to the paper without OCR.
+    json_path = os.path.join(OUTPUT_DIR, f"{disease_name}_baseline.json")
+    save_full_xi_json(disease_name, "baseline_legacy", best, json_path)
+
     print(f"  All {disease_name} plots saved to '{OUTPUT_DIR}/' folder.")
     return best
 
@@ -835,6 +847,13 @@ def main():
                   f"params={res['n_params']}, "
                   f"S0={res['S0']:.4f}, lambda={res['lambda_c']:.5f}, "
                   f"phi={res['phi']:.1f}wk")
+
+    # ----- Append a CSV summary using the same schema as run_comparison.py
+    paper_ref = load_paper_reference()
+    records = [result_to_record(name, "baseline_legacy", res, paper_ref)
+               for name, res in results.items() if res is not None]
+    if records:
+        save_results_csv(records, os.path.join(OUTPUT_DIR, "results_legacy.csv"))
 
     # Generate summary comparison figure
     generate_summary_figure(results)
